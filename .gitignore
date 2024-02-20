@@ -1,0 +1,5 @@
+# Local development settings
+.env
+
+# Database
+db.sqlite3
