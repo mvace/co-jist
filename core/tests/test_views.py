@@ -1,6 +1,7 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework.authtoken.models import Token
 from django.contrib.auth.models import User
 from core.models import Recipe
 
@@ -105,3 +106,59 @@ class UserRegistrationAPITestCase(APITestCase):
         response = self.client.post(self.register_url, self.user_data, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(User.objects.count(), 1)
+
+
+class UserLoginAPITestCase(APITestCase):
+    def setUp(self):
+        self.login_url = reverse("login")
+        self.user = User.objects.create_user(
+            username="testuser", password="testpassword"
+        )
+        self.correct_credentials = {
+            "username": "testuser",
+            "password": "testpassword",
+        }
+        self.incorrect_credentials = {
+            "username": "testuser",
+            "password": "wrongpassword",
+        }
+
+    def test_successfull_login(self):
+        response = self.client.post(
+            self.login_url, self.correct_credentials, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_unsuccessfull_login(self):
+        response = self.client.post(
+            self.login_url, self.incorrect_credentials, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn("token", response.data)
+
+    def test_no_password_login(self):
+        response = self.client.post(
+            self.login_url, {"username": "testuser"}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertNotIn("token", response.data)
+
+
+class UserLogoutAPITestCase(APITestCase):
+    def setUp(self):
+        self.logout_url = reverse("logout")
+        self.user = User.objects.create_user(
+            username="testuser", password="testpassword123"
+        )
+        self.token = Token.objects.create(user=self.user)
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.token.key)
+
+    def test_successful_logout(self):
+        response = self.client.post(self.logout_url)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+    def test_logout_without_being_logged_in(self):
+        self.client.credentials()
+        response = self.client.post(self.logout_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
