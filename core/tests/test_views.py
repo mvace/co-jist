@@ -8,7 +8,6 @@ from core.models import Recipe
 class RecipeAPITests(APITestCase):
 
     def setUp(self):
-        # Setup run before every test method.
         self.user = User.objects.create_user(
             username="testuser", password="testpassword"
         )
@@ -72,3 +71,37 @@ class RecipeAPITests(APITestCase):
         response = self.client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Recipe.objects.count(), 0)
+
+
+class UserRegistrationAPITestCase(APITestCase):
+    def setUp(self):
+        self.register_url = reverse("register")
+        self.user_data = {
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "complex_password",
+        }
+
+    def test_user_registration_success(self):
+        response = self.client.post(self.register_url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(User.objects.count(), 1)
+        self.assertEqual(User.objects.get().username, "testuser")
+
+    def test_user_registration_with_missing_data(self):
+        incomplete_data = self.user_data.copy()
+        del incomplete_data["username"]
+        response = self.client.post(self.register_url, incomplete_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_user_registration_with_invalid_data(self):
+        invalid_data = self.user_data.copy()
+        invalid_data["email"] = "invalid_email"
+        response = self.client.post(self.register_url, invalid_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_user_registration(self):
+        self.client.post(self.register_url, self.user_data, format="json")
+        response = self.client.post(self.register_url, self.user_data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(User.objects.count(), 1)
